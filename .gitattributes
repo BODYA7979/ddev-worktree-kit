@@ -1,0 +1,13 @@
+# Exclude files from releases/tarballs
+tests/ export-ignore
+.github/ export-ignore
+.gitattributes export-ignore
+.editorconfig export-ignore
+scripts/ export-ignore
+Makefile export-ignore
+pyproject.toml export-ignore
+requirements-dev.txt export-ignore
+.gitignore export-ignore
+mkdocs.yml export-ignore
+mkdocs.uk.yml export-ignore
+requirements-docs.txt export-ignore

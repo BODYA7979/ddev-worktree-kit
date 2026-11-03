@@ -1,0 +1,39 @@
+{
+  "#ddev-generated": true,
+  "hooks": {
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c 'import os, subprocess; data = subprocess.check_output([\"git\", \"worktree\", \"list\", \"--porcelain\", \"-z\"]); main = os.fsdecode(data.split(bytes([0]), 1)[0][9:]); os.execvp(\"bash\", [\"bash\", main + \"/.ddev/worktree-kit/claude-worktree-create.sh\"])'",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c 'import os, subprocess; data = subprocess.check_output([\"git\", \"worktree\", \"list\", \"--porcelain\", \"-z\"]); main = os.fsdecode(data.split(bytes([0]), 1)[0][9:]); os.execvp(\"bash\", [\"bash\", main + \"/.ddev/worktree-kit/claude-worktree-remove.sh\"])'",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c 'import os, subprocess; data = subprocess.check_output([\"git\", \"worktree\", \"list\", \"--porcelain\", \"-z\"]); main = os.fsdecode(data.split(bytes([0]), 1)[0][9:]); os.execvp(\"bash\", [\"bash\", main + \"/.ddev/worktree-kit/claude-session-start.sh\"])'",
+            "timeout": 600
+          }
+        ],
+        "matcher": "startup|resume"
+      }
+    ]
+  }
+}

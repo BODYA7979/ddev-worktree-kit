@@ -1,0 +1,56 @@
+site_name: DDEV Worktree Kit
+site_description: Ізольовані DDEV-середовища для worktrees AI-агентів
+site_url: https://bodya7979.github.io/ddev-worktree-kit/uk/
+repo_url: https://github.com/BODYA7979/ddev-worktree-kit
+repo_name: BODYA7979/ddev-worktree-kit
+edit_uri: edit/main/docs/uk/
+docs_dir: docs/uk
+site_dir: site/uk
+theme:
+  language: uk
+  font: false
+  features:
+  - content.code.copy
+  - navigation.sections
+  - navigation.footer
+  - navigation.top
+  - search.highlight
+  palette:
+  - scheme: default
+    toggle:
+      icon: lucide/moon
+      name: Увімкнути темну тему
+  - scheme: slate
+    toggle:
+      icon: lucide/sun
+      name: Увімкнути світлу тему
+markdown_extensions:
+- admonition
+- pymdownx.details
+- pymdownx.superfences
+- tables
+extra:
+  alternate:
+  - name: English
+    link: https://bodya7979.github.io/ddev-worktree-kit/
+    lang: en
+  - name: Українська
+    link: https://bodya7979.github.io/ddev-worktree-kit/uk/
+    lang: uk
+nav:
+- Огляд: index.md
+- Встановлення агентом: agent-setup.md
+- Швидкий старт: quickstart.md
+- Вимоги до хоста: requirements.md
+- Конфігурація: configuration.md
+- Codex та Claude: integrations.md
+- Setup-команди: setup-commands.md
+- Uploads і файли: files.md
+- Drupal multisite: drupal.md
+- Очищення та uninstall: cleanup.md
+- Усунення проблем: troubleshooting.md
+- Архітектура: architecture.md
+- Розробка: development.md
+- Публікація: publishing.md
+- Схожі add-ons: alternatives.md
+- Ліцензії: licenses.md

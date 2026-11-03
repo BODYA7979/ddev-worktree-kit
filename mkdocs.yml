@@ -1,0 +1,56 @@
+site_name: DDEV Worktree Kit
+site_description: Isolated DDEV environments for AI coding worktrees
+site_url: https://bodya7979.github.io/ddev-worktree-kit/
+repo_url: https://github.com/BODYA7979/ddev-worktree-kit
+repo_name: BODYA7979/ddev-worktree-kit
+edit_uri: edit/main/docs/en/
+docs_dir: docs/en
+site_dir: site
+theme:
+  language: en
+  font: false
+  features:
+  - content.code.copy
+  - navigation.sections
+  - navigation.footer
+  - navigation.top
+  - search.highlight
+  palette:
+  - scheme: default
+    toggle:
+      icon: lucide/moon
+      name: Switch to dark mode
+  - scheme: slate
+    toggle:
+      icon: lucide/sun
+      name: Switch to light mode
+markdown_extensions:
+- admonition
+- pymdownx.details
+- pymdownx.superfences
+- tables
+extra:
+  alternate:
+  - name: English
+    link: https://bodya7979.github.io/ddev-worktree-kit/
+    lang: en
+  - name: Українська
+    link: https://bodya7979.github.io/ddev-worktree-kit/uk/
+    lang: uk
+nav:
+- Overview: index.md
+- Install with your agent: agent-setup.md
+- Quick start: quickstart.md
+- Host requirements: requirements.md
+- Configuration: configuration.md
+- Codex and Claude: integrations.md
+- Setup commands: setup-commands.md
+- Uploads and files: files.md
+- Drupal multisite: drupal.md
+- Cleanup and uninstall: cleanup.md
+- Troubleshooting: troubleshooting.md
+- Architecture: architecture.md
+- Development: development.md
+- Publishing: publishing.md
+- Related add-ons: alternatives.md
+- Licenses: licenses.md

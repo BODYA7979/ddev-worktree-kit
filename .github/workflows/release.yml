@@ -1,0 +1,81 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: |
+            requirements-dev.txt
+            requirements-docs.txt
+      - run: python -m pip install -r requirements-dev.txt -r requirements-docs.txt
+      - name: Check tag, version and source
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/check_publication.py --tag "$RELEASE_TAG" --require-clean
+      - run: make check
+      - run: python scripts/build_docs.py
+      - run: python scripts/build_release.py
+      - name: Extract reviewed changelog entry
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/check_publication.py --tag "$RELEASE_TAG" --notes-output dist/release-notes.md
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-candidate
+          path: dist/
+          if-no-files-found: error
+
+  integration:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+        ddev_version: ['tag:v1.25.4', stable]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: ddev/github-action-add-on-test@d614651ba8fffdb956ab7864f191c32353330d68 # ddev/github-action-add-on-test@v2
+        with:
+          ddev_version: ${{ matrix.ddev_version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          addon_repository: ${{ github.repository }}
+          addon_ref: ${{ github.ref }}
+          debug_enabled: false
+          test_command: bats tests --filter-tags !release
+
+  publish:
+    needs: [validate, integration]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-candidate
+          path: dist
+      - name: Publish the validated package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            "dist/ddev-worktree-kit-${RELEASE_TAG}.tar.gz" \
+            "dist/ddev-worktree-kit-${RELEASE_TAG}.tar.gz.sha256" \
+            --verify-tag \
+            --title "DDEV Worktree Kit ${RELEASE_TAG}" \
+            --notes-file dist/release-notes.md

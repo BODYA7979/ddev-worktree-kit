@@ -1,0 +1,47 @@
+name: worktree-kit
+ddev_version_constraint: '>= v1.25.4'
+pre_install_actions:
+  - |
+    #ddev-description: Check the host runtime
+    command -v python3 >/dev/null || { echo 'worktree-kit requires Python 3.10+ on the host'; exit 1; }
+    python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else "Python 3.10+ required")'
+project_files:
+  - commands/host/worktree-kit
+  - worktree-kit/manager.py
+  - worktree-kit/adapter.sh
+  - worktree-kit/codex-setup.sh
+  - worktree-kit/codex-cleanup.sh
+  - worktree-kit/claude-session-start.sh
+  - worktree-kit/claude-worktree-create.sh
+  - worktree-kit/claude-worktree-remove.sh
+  - worktree-kit/claude_worktrees.py
+  - worktree-kit/config_io.py
+  - worktree-kit/config_schema.py
+  - worktree-kit/file_assets.py
+  - worktree-kit/_vendor/LICENSE.PyYAML
+  - worktree-kit/_vendor/__init__.py
+  - worktree-kit/_vendor/yaml/__init__.py
+  - worktree-kit/_vendor/yaml/composer.py
+  - worktree-kit/_vendor/yaml/constructor.py
+  - worktree-kit/_vendor/yaml/cyaml.py
+  - worktree-kit/_vendor/yaml/dumper.py
+  - worktree-kit/_vendor/yaml/emitter.py
+  - worktree-kit/_vendor/yaml/error.py
+  - worktree-kit/_vendor/yaml/events.py
+  - worktree-kit/_vendor/yaml/loader.py
+  - worktree-kit/_vendor/yaml/nodes.py
+  - worktree-kit/_vendor/yaml/parser.py
+  - worktree-kit/_vendor/yaml/reader.py
+  - worktree-kit/_vendor/yaml/representer.py
+  - worktree-kit/_vendor/yaml/resolver.py
+  - worktree-kit/_vendor/yaml/scanner.py
+  - worktree-kit/_vendor/yaml/serializer.py
+  - worktree-kit/_vendor/yaml/tokens.py
+  - worktree-kit/templates/AGENTS.fragment.md
+  - worktree-kit/templates/claude.settings.json
+  - worktree-kit/templates/codex-environment.toml
+  - worktree-kit/templates/worktree-kit.yaml
+global_files: []
+post_install_actions: []
+# Project/client settings and runtime data are retained on add-on removal.
+removal_actions: []

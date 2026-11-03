@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.ruff_cache/
+dist/
+.coverage
+htmlcov/
+.venv/
+.DS_Store
+site/
+.cache/
+.venv-docs/
+.mkdocs-build-*.yml

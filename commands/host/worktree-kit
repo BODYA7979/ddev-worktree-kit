@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#ddev-generated
+## Description: Initialize and inspect DDEV environments for existing Git worktrees
+## Aliases: wtk
+## Usage: worktree-kit <init|setup|status|files|teardown|gc> [options]
+## Example: ddev wtk init
+set -euo pipefail
+exec python3 "$(dirname "${BASH_SOURCE[0]}")/../../worktree-kit/manager.py" "$@"
