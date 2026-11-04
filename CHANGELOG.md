@@ -2,6 +2,12 @@
 
 Versions before the first GitHub publication were local prototype packages.
 
+## [0.5.1] - 2026-11-04
+
+### Fixed
+- Distinguish a new checkout from a removed worktree when Git reuses its internal metadata directory. Preserve the old environment receipt and database while creating an independent environment.
+- Verify checkout generation before reusing a database or running cleanup; keep moved worktrees and unknown ownership protected.
+
 ## [0.5.0] - 2026-11-03
 
 ### Added

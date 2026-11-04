@@ -28,11 +28,12 @@ dump_yaml, load_yaml = config_io.dump_yaml, config_io.load_yaml
 normalize = importlib.import_module("config_schema").normalize
 claude_worktrees = importlib.import_module("claude_worktrees")
 
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 MARKER = "# ddev-worktree-kit: managed v1"
 OVERRIDE = "config.zzzz-worktree-kit.local.yaml"
 COMPOSE = "docker-compose.worktree-kit.yaml"
 GIT_FILE = "worktree-kit.git"
+IDENTITY = "worktree-kit-owner"
 LABEL = "dev.worktree-kit.owner"
 CONFIG = ".ddev/worktree-kit.yaml"
 LEGACY_CONFIG = ".ddev/worktree-kit.json"
@@ -278,6 +279,97 @@ def save_registry(common, registry):
     atomic(common / "ddev-worktree-kit/registry.json", json.dumps(registry, indent=2) + "\n")
 
 
+def checkout_record(registry, root, own):
+    """Git can reuse worktrees/<name>; a basename alone is not a checkout identity."""
+    matches = [
+        (key, row)
+        for key, row in registry["environments"].items()
+        if row["path"] == str(root) and row["git_dir"] == str(own)
+    ]
+    if len(matches) > 1:
+        raise Error("Multiple receipts match this checkout; inspect registry before continuing")
+    return matches[0] if matches else (None, None)
+
+
+def identity_token(own):
+    marker = own / IDENTITY
+    if marker.is_symlink():
+        raise Error("Refusing symlink worktree identity marker")
+    if not marker.exists():
+        return None
+    token = marker.read_text().strip()
+    if not re.fullmatch(r"[0-9a-f]{32}", token):
+        raise Error("Invalid worktree identity marker; inspect registry before continuing")
+    return token
+
+
+def has_local_identity(root, token):
+    if token is None:
+        return False
+    compose = within(root, ".ddev/" + COMPOSE)
+    if compose.is_symlink() or not compose.is_file():
+        return False
+    data = load_yaml(compose.read_text())
+    if not isinstance(data, dict) or not isinstance(data.get("services"), dict):
+        return False
+    for service in ("web", "db"):
+        config = data["services"].get(service)
+        if not isinstance(config, dict) or not isinstance(config.get("labels"), dict):
+            return False
+        if config["labels"].get(LABEL) != token:
+            return False
+    return True
+
+
+def validate_record_identity(record, root, own):
+    token = identity_token(own)
+    if token not in (None, record["token"]) or (record.get("git_identity") and token is None):
+        raise Error("Managed checkout identity changed; refusing to attach its previous DB")
+    if token is None and record["seeded"]:
+        # Upgrade pre-marker receipts only where local ownership proof
+        # survived. A recreated path must not inherit its previous DB.
+        if not has_local_identity(root, record["token"]):
+            raise Error("Managed checkout identity is missing; refusing to attach its previous DB")
+
+
+def initialize_record(registry, root, own, source_root, entries):
+    key, record = checkout_record(registry, root, own)
+    token = identity_token(own)
+    if record:
+        if record["source"] != str(source_root):
+            raise Error("Managed checkout source changed; preserve its DB before reattaching")
+        validate_record_identity(record, root, own)
+    else:
+        registered = {Path(e["worktree"]).resolve() for e in entries}
+        collisions = [
+            row for row in registry["environments"].values() if row["git_dir"] == str(own)
+        ]
+        claimed_token = any(row["token"] == token for row in registry["environments"].values())
+        local_proof = any(
+            (root / ".ddev" / filename).exists() or (root / ".ddev" / filename).is_symlink()
+            for filename in (OVERRIDE, COMPOSE, GIT_FILE)
+        )
+        if (
+            claimed_token
+            or any(row["path"] == str(root) for row in registry["environments"].values())
+            or any(
+                Path(row["path"]).exists() or Path(row["path"]).resolve() in registered
+                for row in collisions
+            )
+            or (collisions and local_proof and not has_local_identity(root, token))
+        ):
+            raise Error(
+                "Managed checkout moved; preserve its DB and inspect registry before reattaching"
+            )
+        # Keep historical receipts and volumes intact. Future lookup uses both
+        # the checkout path and git_dir, including receipts from older versions.
+        digest = hashlib.sha256(f"{own}\0{root}".encode()).hexdigest()[:12]
+        key = own.name if own.name not in registry["environments"] else own.name + "-" + digest
+        if key in registry["environments"]:
+            raise Error("Checkout receipt key is already used; refusing automatic reattachment")
+    return key, record
+
+
 def runtime(root):
     version = ddev_json(root, "version")
     match = re.match(r"v?(\d+)\.(\d+)\.(\d+)(.*)", version.get("DDEV version", ""))
@@ -437,13 +529,8 @@ def init(path, *, source=None, allow_main=False, start=False):
     start_lock = runtime(root)
     with lock(common / "ddev-worktree-kit/registry.lock"):
         registry = load_registry(common)
-        key = own.name
-        record = registry["environments"].get(key)
+        key, record = initialize_record(registry, root, own, source_root, entries)
         current_projects = projects(root)
-        if record and (record["path"] != str(root) or record["source"] != str(source_root)):
-            raise Error(
-                "Managed checkout moved or source changed; preserve its DB and inspect registry before reattaching"
-            )
         if not record:
             digest = hashlib.sha256(f"{common}\0{own}\0{root}".encode()).hexdigest()[:12]
             name = config["name_template"].format(
@@ -465,6 +552,9 @@ def init(path, *, source=None, allow_main=False, start=False):
             }
             registry["environments"][key] = record
             save_registry(common, registry)
+        atomic(own / IDENTITY, record["token"] + "\n")
+        record["git_identity"] = True
+        save_registry(common, registry)
         name = record["name"]
         row = current_projects.get(name)
         if row and Path(row["approot"]).resolve() != root:
@@ -708,18 +798,29 @@ def inventory(path):
     root, common, _, _, entries = context(path)
     registry = load_registry(common)
     registered = {Path(e["worktree"]).resolve() for e in entries}
-    live_git_dirs = set()
+    live_git_dirs = {}
     for entry in entries:
         checkout = Path(entry["worktree"])
         if checkout.exists():
-            live_git_dirs.add(git(checkout, "rev-parse", "--absolute-git-dir"))
+            own = Path(git(checkout, "rev-parse", "--absolute-git-dir"))
+            live_git_dirs[str(own)] = (str(checkout.resolve()), identity_token(own))
     rows = []
     for record in registry["environments"].values():
         location = Path(record["path"])
+        current = live_git_dirs.get(record["git_dir"])
+        # A different token is proof of reuse only when a matching receipt
+        # binds it to the current checkout. Unknown/missing markers retain DBs.
+        reused = current is not None and any(
+            row["path"] == current[0]
+            and row["git_dir"] == record["git_dir"]
+            and row["token"] == current[1]
+            and row["token"] != record["token"]
+            for row in registry["environments"].values()
+        )
         retained = (
             location.exists()
             or location.resolve() in registered
-            or record["git_dir"] in live_git_dirs
+            or (current is not None and not reused)
         )
         rows.append(
             {
@@ -751,9 +852,10 @@ def sync_files(path, apply=False):
         raise Error("Files sync requires a linked worktree; main is protected")
     config = configuration(root, main)
     with lock(common / "ddev-worktree-kit/registry.lock"):
-        record = load_registry(common)["environments"].get(own.name)
+        _, record = checkout_record(load_registry(common), root, own)
         if not record or record["path"] != str(root):
             raise Error("Run init in this checkout before files sync")
+        validate_record_identity(record, root, own)
         source = Path(record["source"])
         if source == root or source not in {Path(entry["worktree"]).resolve() for entry in entries}:
             raise Error("Files source is no longer a registered checkout of this repository")
@@ -810,11 +912,10 @@ def teardown(path, apply=False, yes=False, automatic=False):
         raise Error("Teardown requires both --apply and --yes")
     with lock(common / "ddev-worktree-kit/registry.lock"):
         registry = load_registry(common)
-        row = registry["environments"].get(own.name)
+        key, row = checkout_record(registry, root, own)
         if not row:
             return {"status": "skipped", "reason": "not managed", "path": str(root)}
-        if row["path"] != str(root):
-            raise Error("Managed checkout moved; inspect ownership before teardown")
+        validate_record_identity(row, root, own)
         if automatic and not configuration(root, main)["auto_delete"]:
             return {
                 "status": "skipped",
@@ -830,7 +931,7 @@ def teardown(path, apply=False, yes=False, automatic=False):
             }
         with lock(runtime(root)):
             delete_owned_project(root, row)
-            del registry["environments"][own.name]
+            del registry["environments"][key]
             save_registry(common, registry)
         return {"status": "deleted", "name": row["name"], "path": str(root), "delete_git": False}
 

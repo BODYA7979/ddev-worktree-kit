@@ -10,8 +10,8 @@ Repository: [BODYA7979/ddev-worktree-kit](https://github.com/BODYA7979/ddev-work
 2. Дозвольте GitHub Actions та ввімкніть **Settings → Pages → Build and deployment → Source: GitHub Actions**. Docs workflow публікує англійську й українську з `main`; PR лише збирають і перевіряють artifacts. Після ввімкнення Pages один раз запустіть Documentation workflow через `workflow_dispatch`, якщо перший push відбувся раніше.
 3. Запустіть CI на Linux AMD64/ARM64 з minimum/latest stable DDEV. Перевірте результати перед tag.
 4. Перегляньте `CHANGELOG.md`, узгодьте версію з runtime та локально виконайте `make check`, `make test-addon`, `make docs`, `make package`.
-5. Створіть і запуште відповідний semantic tag, наприклад `v0.5.0`. Release workflow звірить tag/version/changelog, виконає contracts/docs checks, збере пакет і перевірить реальний DDEV перед публікацією GitHub Release assets.
-6. Перевірте release install: `GITHUB_REPO=BODYA7979/ddev-worktree-kit ADDON_RELEASE_VERSION=v0.5.0 bats tests/test.bats --filter-tags release`.
+5. Створіть і запуште відповідний semantic tag, наприклад `v0.5.1`. Release workflow звірить tag/version/changelog, виконає contracts/docs checks, збере пакет і перевірить реальний DDEV перед публікацією GitHub Release assets.
+6. Перевірте release install: `GITHUB_REPO=BODYA7979/ddev-worktree-kit ADDON_RELEASE_VERSION=v0.5.1 bats tests/test.bats --filter-tags release`.
 
 Workflow публікує перевірений artifact після успіху validation jobs. Існуючий release не перезаписується тихо. Для зміненого payload підвищуйте версію та створюйте новий tag.
 

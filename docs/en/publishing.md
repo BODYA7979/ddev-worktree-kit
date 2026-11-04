@@ -10,8 +10,8 @@ These are configured destinations; a local successful build does not mean the re
 2. Allow GitHub Actions and enable **Settings → Pages → Build and deployment → Source: GitHub Actions**. The docs workflow publishes English and Ukrainian from `main`; pull requests only build/check artifacts. After enabling Pages, run the Documentation workflow once with `workflow_dispatch` if the initial push happened before Pages was enabled.
 3. Run the repository CI on Linux AMD64/ARM64 with minimum/latest stable DDEV. Inspect those results before tagging.
 4. Review `CHANGELOG.md`, keep its version aligned with the runtime, and run `make check`, `make test-addon`, `make docs` and `make package` locally.
-5. Create and push a matching semantic version tag, for example `v0.5.0`. The release workflow validates the tag/version/changelog, runs contracts and docs checks, builds the package, and runs real DDEV tests before publishing GitHub Release assets.
-6. Verify the release install with `GITHUB_REPO=BODYA7979/ddev-worktree-kit ADDON_RELEASE_VERSION=v0.5.0 bats tests/test.bats --filter-tags release`.
+5. Create and push a matching semantic version tag, for example `v0.5.1`. The release workflow validates the tag/version/changelog, runs contracts and docs checks, builds the package, and runs real DDEV tests before publishing GitHub Release assets.
+6. Verify the release install with `GITHUB_REPO=BODYA7979/ddev-worktree-kit ADDON_RELEASE_VERSION=v0.5.1 bats tests/test.bats --filter-tags release`.
 
 The release workflow uses the built artifact after its validation jobs pass. It does not silently overwrite an existing release. Bump the version and create a new tag for changed payloads.
 

@@ -18,6 +18,12 @@
 
 Use `ddev wtk status` and `git worktree list` for diagnosis. Do not edit `seeded`, tokens or ownership receipts to bypass safety checks. There is no automatic DB refresh/reset command.
 
+## New checkout reported as moved
+
+Git may reuse an internal directory such as `.git/worktrees/project1` after an earlier checkout is removed. Version 0.5.0 and the private prototype identify receipts by that directory name, so a new checkout at a different path can incorrectly fail with `Managed checkout moved or source changed`. The failure occurs before database seeding and preserves the earlier database.
+
+Version 0.5.1 fixes this by binding receipts to both the checkout path and Git directory, and adding an ownership token in Git's per-worktree metadata. A new checkout receives an independent environment; the old receipt remains available for inspection and confirmed GC. Existing receipts acquire the token only when their local ownership proof matches. Real moves and recreated paths with an unresolved earlier database remain protected. Do not delete the registry or change its recorded paths to force a retry.
+
 ## Upgrade from the private Worktree Env prototype
 
 Version 0.5 adopts the Kit namespace throughout: add-on `worktree-kit`, alias `wtk`, runtime `.ddev/worktree-kit/`, config `.ddev/worktree-kit.yaml`, generated includes and shared Git registry. Simply renaming the YAML is insufficient for an active old environment. Preserve its database and migrate its ownership/configuration together before running Kit init. Stop concurrent AI lifecycle actions during the upgrade. The private prototype upgrade is verified separately from fresh public installation.

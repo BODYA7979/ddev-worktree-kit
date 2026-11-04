@@ -939,6 +939,101 @@ class ManagerTests(unittest.TestCase):
         self.assertFalse(self.cli("gc", cwd=self.main)[0]["gc_candidate"])
         self.assertIn("moved", self.cli("init", cwd=moved, ok=False))
 
+    def test_codex_setup_reuses_git_directory_with_a_separate_environment(self):
+        self.install_callbacks()
+        (self.main / manager.CONFIG).write_text(
+            manager.dump_yaml({"cleanup": {"auto_delete": True}})
+        )
+        old = self.cli("init")
+        self.remove_checkout()  # Simulate removal without a successful cleanup callback.
+        replacement = self.base / "f7ef" / self.target.name
+        replacement.parent.mkdir()
+        self.git(self.main, "worktree", "add", "--detach", str(replacement))
+        self.assertEqual(self.git(replacement, "rev-parse", "--absolute-git-dir"), old["git_dir"])
+        env = {**self.env, "CODEX_WORKTREE_PATH": str(replacement)}
+
+        def callback(event):
+            result = subprocess.run(
+                ["bash", str(self.main / f".ddev/worktree-kit/codex-{event}.sh")],
+                cwd=self.main,
+                env=env,
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return json.loads(result.stdout)
+
+        new = callback("setup")
+        self.assertNotEqual(old["name"], new["name"])
+        self.assertNotEqual(old["token"], new["token"])
+        self.assertEqual(callback("setup")["token"], new["token"])
+        self.assertEqual(len(self.calls("snapshot")), 2)
+        registry = manager.load_registry(self.main / ".git")
+        self.assertIn(old, registry["environments"].values())
+        self.assertEqual(len(registry["environments"]), 2)
+        rows = {row["name"]: row for row in self.cli("gc", cwd=self.main)}
+        self.assertTrue(rows[old["name"]]["gc_candidate"])
+        self.assertFalse(rows[new["name"]]["gc_candidate"])
+        self.cli("files", "sync", cwd=replacement)
+        self.assertEqual(callback("cleanup")["name"], new["name"])
+        self.assertEqual(callback("cleanup")["status"], "skipped")
+        self.assertTrue(replacement.exists())
+        state = json.loads(self.state.read_text())
+        self.assertIn(old["name"] + "-mariadb", state["volumes"])
+        self.assertNotIn(new["name"] + "-mariadb", state["volumes"])
+        self.assertEqual(len(self.calls("delete")), 1)
+        self.assertNotIn(old["name"], str(self.calls("delete")))
+        self.assertEqual(callback("setup")["phase"], "ready")
+
+    def test_recreated_checkout_at_same_path_does_not_inherit_old_database(self):
+        old = self.cli("init")
+        self.remove_checkout()
+        self.git(self.main, "worktree", "add", "--detach", str(self.target))
+        self.assertIn("identity", self.cli("init", ok=False))
+        self.assertIn("identity", self.cli("teardown", "--apply", "--yes", ok=False))
+        self.assertIn("identity", self.cli("files", "sync", "--apply", ok=False))
+        self.assertIn(old["name"] + "-mariadb", json.loads(self.state.read_text())["volumes"])
+        self.assertEqual(len(self.calls("start")), 1)
+        self.assertFalse(self.calls("delete"))
+
+    def test_legacy_receipt_upgrades_identity_without_reseeding(self):
+        old = self.cli("init")
+        common = self.main / ".git"
+        registry = manager.load_registry(common)
+        for row in registry["environments"].values():
+            row.pop("git_identity")
+        manager.save_registry(common, registry)
+        (Path(old["git_dir"]) / manager.IDENTITY).unlink()
+        upgraded = self.cli("init")
+        self.assertEqual(upgraded["token"], old["token"])
+        self.assertEqual(upgraded["name"], old["name"])
+        self.assertTrue(upgraded["git_identity"])
+        self.assertEqual(len(self.calls("snapshot")), 1)
+
+    def test_legacy_moved_checkout_remains_protected_without_identity_marker(self):
+        old = self.cli("init")
+        common = self.main / ".git"
+        registry = manager.load_registry(common)
+        for row in registry["environments"].values():
+            row.pop("git_identity")
+        manager.save_registry(common, registry)
+        (Path(old["git_dir"]) / manager.IDENTITY).unlink()
+        moved = self.base / "moved legacy"
+        self.git(self.main, "worktree", "move", str(self.target), str(moved))
+        self.assertIn("moved", self.cli("init", cwd=moved, ok=False))
+        self.assertFalse(self.cli("gc", cwd=self.main)[0]["gc_candidate"])
+        self.assertFalse(self.calls("delete"))
+
+    def test_gc_keeps_moved_checkout_with_an_unknown_identity_token(self):
+        old = self.cli("init")
+        moved = self.base / "moved unknown identity"
+        self.git(self.main, "worktree", "move", str(self.target), str(moved))
+        (Path(old["git_dir"]) / manager.IDENTITY).write_text("0" * 32 + "\n")
+        self.assertIn("moved", self.cli("init", cwd=moved, ok=False))
+        self.assertFalse(self.cli("gc", cwd=self.main)[0]["gc_candidate"])
+        self.assertFalse(self.cli("gc", "--apply", "--yes", cwd=self.main)[0]["gc_candidate"])
+        self.assertFalse(self.calls("delete"))
+
     def test_gc_refuses_ddev_registry_reassignment(self):
         result = self.cli("init")
         self.remove_checkout()
